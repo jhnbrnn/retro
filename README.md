@@ -1,44 +1,25 @@
-# Standup
+# Retro
+
+A tool for running retros.
+
+<img width="1409" alt="retro_screenshot" src="https://user-images.githubusercontent.com/3317231/72572068-4994b400-3876-11ea-8d35-44f5789f574b.png">
+
+## Getting Started
+
+1. `npm install` // Install package dependencies.
+1. `npm run start:dev-client` // Starts webpack dev server for the client-side code running on **localhost:4000**.
+1. `npm run start:dev-server` // Starts the express server running locally.
+
+## Server a build of the app over HTTPS using NGROK
+_This makes it easy for others to access the app over the internet_
+1. `npm run prod`
 
 ## TODO
 
-1. sockets for column create, delete, rename
-* [x] Ability to rename columns
-* [x] socket wire ups
+1. style!
+* [ ] make it look nice - WIP
 
-2. create a board (index -> create new button -> new board with unique URL)
-* [x] board is held in memory - don't overthink it
-* [x] board stores name, context
-* [x] UUID for column ids - board stores column IDs
-* [x] socket on "connection" passes down name/context/boards if you create/join
-* [x] "create new board" from step 2 creates & passes initial columns to board on creation
-
-3. store data so people joining URL see what's already been created
-* [x] store card data in memory on server
-* [x] socket on "connection" passes columns and cards down to client
-
-4. editable board traits
-* [x] title saves to server
-* [ ] description saves to server
-
-5. make it public!
-* [x] figure out ngrok or some other system
-
-6. style!
-* [ ] make it look nice
-
-7. voting
-* [ ] config - number of votes per user
-* [ ] users can't remove other users' votes
-
-8. cleanup
-* [ ] share button now shares link
-* [ ] column data: title vs name, id vs key. Gross.
-
-9. Features
+2. Features
 * [ ] GIF support (/rich text?)
 * [ ] Colours for columns
-
-## BUGS
-* [ ] when you refresh the page, you can't edit your cards (session auth)
-* [ ] when you edit the column names, all the card data is deleted locally (not on the server, thankfully)
+* [ ] Sort the cards in columns by the number of ⭐️s 

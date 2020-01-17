@@ -1,9 +1,16 @@
 html, body, #react-root {
   height: 100%;
+  background-color: #e6e6e6;
 }
 
 body {
   margin: 0;
+  font: 400 11px tahoma;
+}
+
+input,
+textarea {
+  font: 400 11px tahoma;
 }
 
 footer {
@@ -11,6 +18,37 @@ footer {
   grid-template-columns: repeat(12, 1fr);
 }
 
-footer {
-  height: 4%;
+h2 {
+  font-size: 1.5em;
+  margin: 1.0em 0;
+}
+
+.alert {
+  display: none;
+}
+
+.alert--show {
+  position: fixed;
+  bottom: 0px;
+  display: block;
+}
+
+.alert-star-limit {
+  border: 1px solid orangered;
+  background-color: #363636;
+  width: 100%;
+  color: white;
+  font-size: 1.5em;
+  padding: 15px 10px
+}
+
+.button {
+  padding: 5px 10px;
+}
+
+.button--create {
+  color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  background-color: #007B23;
+  font-weight: 700;
 }

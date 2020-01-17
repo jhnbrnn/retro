@@ -1,26 +1,20 @@
 import * as React from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPencilAlt, faCog } from "@fortawesome/free-solid-svg-icons";
-
-import "./main.css";
 import { Column } from "../Column/Column";
 import uuid = require("uuid");
 import { BoardControls } from "../BoardControls/BoardControls";
 
-interface ColumnData {
-  key: string;
-  name: string;
-}
+import "./main.css";
 
 interface MainProps {
   socket: SocketIOClient.Socket;
   boardId: string;
+  showResults: boolean;
 }
 
 interface MainState {
-  columns: ColumnData[];
+  columns: BoardColumn[];
   boardTitle: string;
-  boardDescription: string;
+  remainingStars?: number | undefined;
 }
 
 export class Main extends React.Component<MainProps, MainState> {
@@ -29,16 +23,34 @@ export class Main extends React.Component<MainProps, MainState> {
     this.state = {
       columns: [],
       boardTitle: "",
-      boardDescription: "",
     }
   }
 
-  componentWillMount() {
-    this.props.socket.on(`board:loaded:${this.props.boardId}`, (data: any) => {
-      data.columns.forEach((column: {id: string}) => {
+  componentDidMount() {
+    this.props.socket.on(`board:loaded:${this.props.boardId}`, (
+      data: { board: Board, sessionId: string, remainingStars: number },
+    ) => {
+      this.setState({
+        remainingStars: data.remainingStars,
+        boardTitle: data.board.title,
+      });
+      sessionStorage.setItem("retroSessionId", data.sessionId);
+      data.board.columns.forEach((column: {id: string}) => {
         this.addColumn(column);
       });
     });
+
+    this.props.socket.on(`board:updated:${this.props.boardId}`, (data: any) => {
+      this.setState({
+        boardTitle: data.title,
+      });
+    });
+
+    this.props.socket.on(`board:update-remaining-stars:${this.props.boardId}`, (data: any) => {
+      this.setState({
+        remainingStars: data.remainingStars,
+      });
+    })
 
     this.props.socket.on(`column:created:${this.props.boardId}`, (data: any) => {
       this.addColumn(data);
@@ -51,23 +63,30 @@ export class Main extends React.Component<MainProps, MainState> {
 
   componentWillUnmount() {
     this.props.socket.removeListener(`board:loaded:${this.props.boardId}`);
+    this.props.socket.removeListener(`board:update-remaining-stars:${this.props.boardId}`);
+    this.props.socket.removeListener(`column:deleted:${this.props.boardId}`);
+    this.props.socket.removeListener(`column:created:${this.props.boardId}`);
   }
 
   addColumn(column?: any) {
     let newColumns = this.state.columns.slice(0);
     if (column) {
-      newColumns.push({key: column.id, name: column.title});
+      newColumns.push({ id: column.id, name: column.name, isEditing: false });
       this.props.socket.emit("column:loaded", {
         boardId: this.props.boardId,
         id: column.id,
+        sessionId: sessionStorage.getItem("retroSessionId"),
       });
     } else {
-      const newColumn = {key: uuid.v4(), name: "New Column"};
-      newColumns.push(newColumn)
+      const newColumn = { id: uuid.v4(), name: "New Column", isEditing: true };
+
+      newColumns.push(newColumn);
+
       this.props.socket.emit("column:created", {
         boardId: this.props.boardId,
-        id: newColumn.key,
-        name: newColumn.name
+        id: newColumn.id,
+        name: newColumn.name,
+        sessionId: sessionStorage.getItem("retroSessionId"),
       });
     }
 
@@ -76,17 +95,24 @@ export class Main extends React.Component<MainProps, MainState> {
 
   renderColumns() {
     let markup: JSX.Element[] = [];
+    const oneHundredPercent = 100;
+    const columnCount = this.state.columns.length;
+    const maxWidthPercentage = oneHundredPercent / columnCount;
 
-    for (let i = 0; i < this.state.columns.length; i++) {
+    for (let i = 0; i < columnCount; i++) {
       let name = this.state.columns[i].name;
       markup.push(
         <Column
-          key={this.state.columns[i].key}
-          id={this.state.columns[i].key}
+          key={this.state.columns[i].id}
+          id={this.state.columns[i].id}
           name={name}
-          deleteColumn={(event, key) =>this.deleteColumn(event, key)}
+          deleteColumn={(event) =>this.deleteColumn(event, this.state.columns[i].id)}
           socket={this.props.socket}
-          boardId={this.props.boardId}>
+          boardId={this.props.boardId}
+          maxWidthPercentage={maxWidthPercentage}
+          isEditing={this.state.columns[i].isEditing}
+          showResults={this.props.showResults}
+        >
         </Column>
       );
     }
@@ -94,37 +120,36 @@ export class Main extends React.Component<MainProps, MainState> {
     return markup;
   }
 
-  deleteColumn(event: React.MouseEvent | null, key: string, fromSocket: boolean = false) {
+  deleteColumn(event: React.MouseEvent | null, id: string, fromSocket: boolean = false) {
     if (event) {
       event.preventDefault();
     }
 
-    let newColumns = this.state.columns.filter((column: ColumnData) => {
-      return column.key !== key;
+    let newColumns = this.state.columns.filter((column: BoardColumn) => {
+      return column.id !== id;
     });
 
     if (!fromSocket) {
       this.props.socket.emit(`column:deleted`, {
         boardId: this.props.boardId,
-        id: key,
+        id,
+        sessionId: sessionStorage.getItem("retroSessionId"),
       });
     }
 
     this.setState({columns: newColumns});
   }
 
-
   render() {
-    console.log(this.state.boardTitle);
     return (
       <main>
         <BoardControls
           addColumn={() => this.addColumn()}
           title={this.state.boardTitle}
-          description={this.state.boardDescription}
           socket={this.props.socket}
-          boardId={this.props.boardId}>
-
+          boardId={this.props.boardId}
+          remainingStars={this.state.remainingStars}
+        >
         </BoardControls>
         <div id="columns">
           {this.renderColumns()}

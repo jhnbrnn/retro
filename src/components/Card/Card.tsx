@@ -1,25 +1,30 @@
 import * as React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPencilAlt, faThumbsUp, faThumbsDown } from "@fortawesome/free-solid-svg-icons";
+import { faPencilAlt, faUndo } from "@fortawesome/free-solid-svg-icons";
+import { ButtonDelete } from "../ButtonDelete/ButtonDelete";
 
 import "./card.css";
 
 interface CardProps {
   key: string;
   id: string;
-  deleteCard: (event: React.MouseEvent, key: string) => void;
+  deleteCard: (event: React.MouseEvent, id: string) => void;
   editable: boolean;
+  isEditing: boolean;
   socket: SocketIOClient.Socket;
   columnId: string;
   boardId: string;
   text: string;
-  votes: number;
+  starsCount: number;
+  showResults: boolean;
+  userStars: number;
 }
 
 interface CardState {
   isEditing: boolean;
   text: string;
-  votes: number;
+  starsCount: number;
+  userStars: number;
 }
 
 export class Card extends React.Component<CardProps, CardState> {
@@ -27,37 +32,43 @@ export class Card extends React.Component<CardProps, CardState> {
     super(props);
 
     let stateToSet = {
-      isEditing: true,
-      votes: this.props.votes,
+      isEditing: this.props.isEditing,
       text: this.props.text,
+      userStars: this.props.userStars,
+      starsCount: this.props.starsCount,
     }
 
-    if (!this.props.editable) {
-      stateToSet.isEditing = false;
-    }
     this.state = stateToSet;
   }
 
-  componentWillMount() {
+  componentDidMount() {
     this.props.socket.on(`card:updated:${this.props.id}`, (data: any) => {
       this.setState({
         text: data.text,
       });
     });
 
-    this.props.socket.on(`card:voted:${this.props.id}`, (data: any) => {
-      this.setState({
-        votes: this.state.votes + data.vote,
-      });
+    this.props.socket.on(`card:starred:${this.props.id}`, (
+      data: { starsCount: number, userStars: number }
+    ) => {
+      if(!!data) {
+        this.setState({
+          starsCount: data.starsCount,
+          userStars: data.userStars !== undefined ? data.userStars : this.state.userStars,
+        });
+      }
     });
   }
 
   componentWillUnmount() {
     this.props.socket.removeListener(`card:updated:${this.props.id}`);
+    this.props.socket.removeListener(`card:starred:${this.props.id}`);
   }
 
-  flipEditable(event: React.MouseEvent) {
-    event.preventDefault();
+  toggleIsEditing(event?: React.MouseEvent) {
+    if (!!event) {
+      event.preventDefault();
+    }
     let newState = {
       isEditing: !this.state.isEditing,
     }
@@ -65,43 +76,63 @@ export class Card extends React.Component<CardProps, CardState> {
     this.setState(newState);
   }
 
-  save(event: React.MouseEvent) {
-    this.flipEditable(event);
+  save(event: React.FormEvent) {
+    event.preventDefault();
+    this.toggleIsEditing();
 
     this.props.socket.emit(`card:updated`, {
       boardId: this.props.boardId,
       columnId: this.props.columnId,
       id: this.props.id,
       text: this.state.text,
+      sessionId: sessionStorage.getItem("retroSessionId"),
     });
   }
 
-  voteUp(event: React.MouseEvent) {
+  starUp(event: React.MouseEvent) {
     event.preventDefault();
 
-    this.props.socket.emit("card:voted", {
+    this.props.socket.emit("card:starred", {
       boardId: this.props.boardId,
       columnId: this.props.columnId,
       id: this.props.id,
-      vote: 1
+      star: 1,
+      sessionId: sessionStorage.getItem("retroSessionId"),
     });
-
-    this.setState({
-      votes: this.state.votes + 1,
-    })
   }
 
-  voteDown(event: React.MouseEvent) {
+  starDown(event: React.MouseEvent) {
     event.preventDefault();
 
-    this.props.socket.emit("card:voted", {
+    this.props.socket.emit("card:starred", {
       boardId: this.props.boardId,
       columnId: this.props.columnId,
       id: this.props.id,
-      vote: -1
+      star: -1,
+      sessionId: sessionStorage.getItem("retroSessionId"),
     });
+  }
 
-    this.setState({votes: this.state.votes - 1});
+  renderUserStars() {
+    return (
+      <span className="user-stars">
+        {this.state.userStars > 0 ? this.state.userStars : this.state.userStars}
+      </span>
+    );
+  }
+
+  renderResults() {
+    return (
+      <span className="star-count">{this.state.starsCount}</span>
+    );
+  }
+
+  renderUndoButton() {
+    return (
+      <button onClick={event => this.starDown(event)} className="undo-button">
+        <FontAwesomeIcon icon={faUndo} />
+      </button>
+    );
   }
 
   render() {
@@ -109,24 +140,28 @@ export class Card extends React.Component<CardProps, CardState> {
 
     if (this.state.isEditing) {
       cardContents = (
-        <div>
-          <textarea onChange={event => this.setState({text: event.target.value})} value={this.state.text}></textarea>
-          <button onClick={event => this.save(event)}>Add</button>
-          <a href="" onClick={event => this.props.deleteCard(event, this.props.id)}><FontAwesomeIcon icon={faTrash} /></a>
-        </div>
+        <form onSubmit={event => this.save(event)}>
+          <textarea
+            autoFocus={true}
+            onChange={event => this.setState({text: event.target.value})}
+            value={this.state.text}>
+          </textarea>
+          <div className="card--footer">
+            <button type="submit">Save</button>
+            <ButtonDelete
+              id={this.props.id}
+              handleClick={(event, id) => this.props.deleteCard(event, id as string)}
+            />
+          </div>
+        </form>
       );
     } else {
-      let downvote;
-      if (this.state.votes > 0) {
-        downvote = (
-          <a href="" onClick={event => this.voteDown(event)} className="vote-link"><FontAwesomeIcon icon={faThumbsDown} /></a>
-        );
-      }
-
       let editLink;
       if (this.props.editable) {
         editLink = (
-          <a href="" onClick={event => this.flipEditable(event)} className="edit-link"><FontAwesomeIcon icon={faPencilAlt} /></a>
+          <a href="" onClick={event => this.toggleIsEditing(event)} className="edit-link">
+            <FontAwesomeIcon icon={faPencilAlt} />
+          </a>
         );
       }
 
@@ -134,12 +169,17 @@ export class Card extends React.Component<CardProps, CardState> {
 
       cardContents = (
         <div className={textAndNonEditable ? "blur" : undefined}>
-          <div>{this.state.text}</div>
-          {editLink}
-          <a href="" onClick={event => this.voteUp(event)} className="vote-link"><FontAwesomeIcon icon={faThumbsUp} /></a>
-          <span className="vote-count">{this.state.votes}</span>
-          {downvote}
-        </div>);
+          <p className="card--text">{this.state.text}{editLink}</p>
+
+          <div className="card--footer">
+            <span className="star-button" onClick={event => this.starUp(event)}>
+              ⭐️
+            </span>
+            { this.props.showResults ? this.renderResults() : this.renderUserStars() }
+            { this.state.userStars > 0 ? this.renderUndoButton() : null }
+          </div>
+        </div>
+      );
     }
 
     return (

@@ -1,18 +1,17 @@
 import * as React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPencilAlt, faCog } from "@fortawesome/free-solid-svg-icons";
+import { faPencilAlt } from "@fortawesome/free-solid-svg-icons";
 
+import "./board-controls.css";
 interface BoardControlsProps {
   addColumn: () => void;
   title: string;
-  description: string;
   socket: SocketIOClient.Socket;
   boardId: string;
+  remainingStars: number | undefined;
 };
 
 interface BoardControlsState {
-  title: string;
-  description: string;
   isEditingTitle: boolean;
 }
 
@@ -23,27 +22,10 @@ export class BoardControls extends React.Component<BoardControlsProps, BoardCont
     super(props);
 
     this.state = {
-      title: this.props.title,
-      description: this.props.description,
       isEditingTitle: false,
     }
 
     this.titleInput = React.createRef();
-  }
-
-  componentWillMount() {
-    this.props.socket.on(`board:loaded:${this.props.boardId}`, (data: any) => {
-      this.setState({
-        description: data.description,
-        title: data.title,
-      });
-    });
-
-    this.props.socket.on(`board:updated:${this.props.boardId}`, (data: any) => {
-      this.setState({
-        title: data.title,
-      });
-    });
   }
 
   editTitle(event?: React.MouseEvent) {
@@ -56,12 +38,10 @@ export class BoardControls extends React.Component<BoardControlsProps, BoardCont
   }
 
   saveTitle() {
-    this.setState({
-      title: (this.titleInput as any).current.value
-    });
     this.props.socket.emit("board:updated", {
       boardId: this.props.boardId,
-      title: (this.titleInput as any).current.value
+      title: this.titleInput?.current?.value,
+      sessionId: sessionStorage.getItem("retroSessionId"),
     });
     this.editTitle();
   }
@@ -70,28 +50,39 @@ export class BoardControls extends React.Component<BoardControlsProps, BoardCont
     let boardTitle;
     if (this.state.isEditingTitle) {
       boardTitle = (
-        <>
-          <input type="text" defaultValue={this.state.title} ref={this.titleInput}></input>
-          <button onClick={this.saveTitle.bind(this)}>Save</button>
-          <a href="" onClick={event => this.editTitle(event)}>cancel</a>
-        </>
+        <div id="board-title">
+          <input className="board-title--text" type="text" autoFocus={true} defaultValue={this.props.title} ref={this.titleInput}></input>
+          <div className="board-title--actions">
+            <button onClick={this.saveTitle.bind(this)}>Save</button>
+            <a href="" onClick={event => this.editTitle(event)}>cancel</a>
+          </div>
+        </div>
       );
     } else {
-      boardTitle = <div id="board-title">{this.state.title}<FontAwesomeIcon icon={faPencilAlt} onClick={() => this.editTitle()} /></div>;
+      boardTitle = (
+        <div id="board-title">
+          <h1 className="board-title--text">
+            {this.props.title} <FontAwesomeIcon icon={faPencilAlt} className="pencil-icon" onClick={() => this.editTitle()} />
+          </h1>
+        </div>
+      );
     }
 
     return (
-      <>
-        {boardTitle}
-        <div id="board-description">
-          <input placeholder="Set the context of the retrospective here..." />
+      <div id="board-controls">
+        { boardTitle }
+        <div className="board-actions">
+          <button
+            className="button button--create"
+            onClick={() => this.props.addColumn()}
+          >
+            New Column
+          </button>
         </div>
-        <div id="board-controls">
-          <button>Share</button>
-          <button onClick={() => this.props.addColumn()}>New Column</button>
-          <a href="#"><FontAwesomeIcon icon={faCog} /></a>
-        </div>
-      </>
+        <strong className="stars-remaining">
+          Remaining ⭐️: {this.props.remainingStars}
+        </strong>
+      </div>
     );
   }
 }
